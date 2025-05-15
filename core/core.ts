@@ -1,5 +1,4 @@
 import { fetchwithRequestOptions } from "@continuedev/fetch";
-import * as URI from "uri-js";
 import { v4 as uuidv4 } from "uuid";
 
 import { CompletionProvider } from "./autocomplete/CompletionProvider";
@@ -192,8 +191,7 @@ export class Core {
       const serializedResult = await this.configHandler.getSerializedConfig();
       this.messenger.send("configUpdate", {
         result: serializedResult,
-        profileId:
-          this.configHandler.currentProfile?.profileDescription.id || null,
+        profileId: this.configHandler.currentProfilesId,
         organizations: this.configHandler.getSerializedOrgs(),
         selectedOrgId: this.configHandler.currentOrg.id,
       });
@@ -377,7 +375,7 @@ export class Core {
       if (selectOrgId) {
         await this.configHandler.setSelectedOrgId(selectOrgId, selectProfileId);
       } else if (selectProfileId) {
-        await this.configHandler.setSelectedProfileId(selectProfileId);
+        await this.configHandler.setSelectedProfileIds([selectProfileId]);
       }
     });
 
@@ -454,8 +452,7 @@ export class Core {
     on("config/getSerializedProfileInfo", async (msg) => {
       return {
         result: await this.configHandler.getSerializedConfig(),
-        profileId:
-          this.configHandler.currentProfile?.profileDescription.id ?? null,
+        profileId: this.configHandler.currentProfilesId,
         organizations: this.configHandler.getSerializedOrgs(),
         selectedOrgId: this.configHandler.currentOrg.id,
       };
@@ -657,8 +654,8 @@ export class Core {
     });
 
     on("didChangeSelectedProfile", async (msg) => {
-      if (msg.data.id) {
-        await this.configHandler.setSelectedProfileId(msg.data.id);
+      if (msg.data.ids) {
+        await this.configHandler.setSelectedProfileIds(msg.data.ids);
       }
     });
 
@@ -815,26 +812,26 @@ export class Core {
     if (data?.uris?.length) {
       walkDirCache.invalidate(); // safe approach for now - TODO - only invalidate on relevant changes
       for (const uri of data.uris) {
-        const currentProfileUri =
-          this.configHandler.currentProfile?.profileDescription.uri ?? "";
+        // const currentProfileUri =
+        //   this.configHandler.currentProfile?.profileDescription.uri ?? "";
 
-        if (URI.equal(uri, currentProfileUri)) {
-          // Trigger a toast notification to provide UI feedback that config has been updated
-          const showToast =
-            this.globalContext.get("showConfigUpdateToast") ?? true;
-          if (showToast) {
-            const selection = await this.ide.showToast(
-              "info",
-              "Config updated",
-              "Don't show again",
-            );
-            if (selection === "Don't show again") {
-              this.globalContext.update("showConfigUpdateToast", false);
-            }
-          }
-          await this.configHandler.reloadConfig();
-          continue;
-        }
+        // if (URI.equal(uri, currentProfileUri)) {
+        //   // Trigger a toast notification to provide UI feedback that config has been updated
+        //   const showToast =
+        //     this.globalContext.get("showConfigUpdateToast") ?? true;
+        //   if (showToast) {
+        //     const selection = await this.ide.showToast(
+        //       "info",
+        //       "Config updated",
+        //       "Don't show again",
+        //     );
+        //     if (selection === "Don't show again") {
+        //       this.globalContext.update("showConfigUpdateToast", false);
+        //     }
+        //   }
+        //   await this.configHandler.reloadConfig();
+        //   continue;
+        // }
 
         if (
           uri.endsWith(".continuerc.json") ||

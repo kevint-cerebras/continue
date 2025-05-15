@@ -7,7 +7,7 @@ import {
   ExclamationTriangleIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../../context/Auth";
 import { IdeMessengerContext } from "../../../context/IdeMessenger";
 import {
@@ -16,12 +16,7 @@ import {
   setSelectedProfile,
 } from "../../../redux";
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
-import {
-  fontSize,
-  getMetaKeyLabel,
-  isLocalProfile,
-  isMetaEquivalentKeyPressed,
-} from "../../../util";
+import { fontSize, getMetaKeyLabel, isLocalProfile } from "../../../util";
 import {
   Listbox,
   ListboxButton,
@@ -42,7 +37,7 @@ import AssistantIcon from "./AssistantIcon";
 interface AssistantSelectOptionProps {
   profile: ProfileDescription;
   selected: boolean;
-  onClick: () => void;
+  onClick: (isSelected: boolean) => void;
 }
 
 const AssistantSelectOption = ({
@@ -63,18 +58,12 @@ const AssistantSelectOption = ({
   const ideMessenger = useContext(IdeMessengerContext);
 
   function handleOptionClick() {
-    // optimistic update
-    dispatch(setSelectedProfile(profile.id));
-    // notify core which will handle actual update
-    ideMessenger.post("didChangeSelectedProfile", {
-      id: profile.id,
-    });
-    onClick();
+    // Toggle selection
+    onClick(!selected);
   }
 
   function handleConfigure() {
     ideMessenger.post("config/openProfile", { profileId: profile.id });
-    onClick();
   }
 
   function handleClickError() {
@@ -84,7 +73,6 @@ const AssistantSelectOption = ({
     } else {
       ideMessenger.post("config/openProfile", { profileId: profile.id });
     }
-    onClick();
   }
 
   return (
@@ -159,6 +147,14 @@ export default function AssistantSelect() {
   const ideMessenger = useContext(IdeMessengerContext);
   const { isToolbarExpanded } = useLump();
   const [loading, setLoading] = useState(false);
+  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
+
+  // Initialize with currently selected profile
+  useState(() => {
+    if (selectedProfile) {
+      setSelectedProfiles([selectedProfile.id]);
+    }
+  });
 
   const { profiles, session, login } = useAuth();
   const navigate = useNavigate();
@@ -168,6 +164,7 @@ export default function AssistantSelect() {
       buttonRef.current.click();
     }
   }
+
   function onNewAssistant() {
     ideMessenger.post("controlPlane/openUrl", {
       path: "new",
@@ -176,46 +173,33 @@ export default function AssistantSelect() {
     close();
   }
 
-  useEffect(() => {
-    let lastToggleTime = 0;
-    const DEBOUNCE_MS = 800;
+  const handleProfileSelection = (profileId: string, isSelected: boolean) => {
+    let newSelectedProfiles: string[];
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === "'" &&
-        isMetaEquivalentKeyPressed(event as any) &&
-        event.shiftKey
-      ) {
-        const now = Date.now();
+    if (isSelected) {
+      // Add to selection
+      newSelectedProfiles = [...selectedProfiles, profileId];
+    } else {
+      // Remove from selection
+      newSelectedProfiles = selectedProfiles.filter((id) => id !== profileId);
+    }
 
-        if (now - lastToggleTime >= DEBOUNCE_MS) {
-          lastToggleTime = now;
+    setSelectedProfiles(newSelectedProfiles);
 
-          const profileIds = profiles?.map((profile) => profile.id) ?? [];
-          // In case of 1 or 0 profiles just does nothing
-          if (profileIds.length < 2) {
-            return;
-          }
-          let nextId = profileIds[0];
-          if (selectedProfile) {
-            const curIndex = profileIds.indexOf(selectedProfile.id);
-            const nextIndex = (curIndex + 1) % profileIds.length;
-            nextId = profileIds[nextIndex];
-          }
-          // Optimistic update
-          dispatch(setSelectedProfile(nextId));
-          ideMessenger.post("didChangeSelectedProfile", {
-            id: nextId,
-          });
-        }
-      }
-    };
+    // Create concatenated ID with ":::" delimiter
+    const combinedProfileId = newSelectedProfiles.join(":::");
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [currentOrg, selectedProfile]);
+    // Only dispatch if there's at least one profile selected
+    if (newSelectedProfiles.length > 0) {
+      // Optimistic update for UI
+      dispatch(setSelectedProfile(combinedProfileId));
+
+      // Notify core
+      ideMessenger.post("didChangeSelectedProfile", {
+        ids: newSelectedProfiles,
+      });
+    }
+  };
 
   const cycleOrgs = () => {
     const orgIds = orgs.map((org) => org.id);
@@ -238,27 +222,11 @@ export default function AssistantSelect() {
   const tinyFont = useFontSize(-4);
   const smallFont = useFontSize(-3);
 
-  if (!selectedProfile) {
-    return (
-      <div
-        onClick={() => {
-          ideMessenger.request("controlPlane/openUrl", {
-            path: "/new?type=assistant",
-            orgSlug: currentOrg?.slug,
-          });
-        }}
-        className="flex cursor-pointer select-none items-center gap-1 text-gray-400"
-        style={{ fontSize: smallFont }}
-      >
-        <PlusIcon className="h-3 w-3 flex-shrink-0 select-none" />
-        <span
-          className={`line-clamp-1 select-none break-all ${isToolbarExpanded ? "xs:hidden sm:line-clamp-1" : ""}`}
-        >
-          Create your first assistant
-        </span>
-      </div>
-    );
-  }
+  // Get the selected profile objects based on IDs
+  const selectedProfileObjects = useMemo(() => {
+    if (!profiles) return [];
+    return profiles.filter((profile) => selectedProfiles.includes(profile.id));
+  }, [profiles, selectedProfiles]);
 
   return (
     <Listbox>
@@ -269,16 +237,7 @@ export default function AssistantSelect() {
           className="border-none bg-transparent text-gray-400 hover:brightness-125"
           style={{ fontSize: fontSize(-3) }}
         >
-          <div className="flex flex-row items-center gap-1.5">
-            <div className="h-3 w-3 flex-shrink-0 select-none">
-              <AssistantIcon size={3} assistant={selectedProfile} />
-            </div>
-            <span
-              className={`line-clamp-1 select-none break-all ${isToolbarExpanded ? "xs:hidden sm:line-clamp-1" : ""}`}
-            >
-              {selectedProfile.title}
-            </span>
-          </div>
+          {`${selectedProfileObjects.length} Tags`}
           <ChevronDownIcon
             className="h-2 w-2 flex-shrink-0 select-none"
             aria-hidden="true"
@@ -316,8 +275,10 @@ export default function AssistantSelect() {
                   <AssistantSelectOption
                     key={idx}
                     profile={profile}
-                    onClick={close}
-                    selected={profile.id === selectedProfile.id}
+                    onClick={(isSelected) =>
+                      handleProfileSelection(profile.id, isSelected)
+                    }
+                    selected={selectedProfiles.includes(profile.id)}
                   />
                 );
               })}

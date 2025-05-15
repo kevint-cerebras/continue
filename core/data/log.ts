@@ -58,8 +58,7 @@ export class DataLogger {
         : "Unknown/Unknown (Continue/Unknown)";
     }
     if ("selectedProfileId" in zodSchema.shape) {
-      newBody.selectedProfileId =
-        this.core?.configHandler.currentProfile?.profileDescription.id ?? "";
+      newBody.selectedProfileId = this.core?.configHandler.currentProfilesId;
     }
     if ("userId" in zodSchema.shape) {
       newBody.userId = ideSettings?.userToken ?? "";
@@ -177,9 +176,7 @@ export class DataLogger {
                   await this.core?.configHandler.controlPlaneClient.getAccessToken();
                 headers["Authorization"] = `Bearer ${accessToken}`;
               }
-              const profileId =
-                this.core?.configHandler.currentProfile?.profileDescription
-                  .id ?? "";
+              const profileId = this.core?.configHandler.currentProfilesId;
               const response = await fetchwithRequestOptions(
                 dataConfig.destination,
                 {

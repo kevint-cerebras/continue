@@ -573,11 +573,15 @@ const getCommandsMap: (
             await addEntireFileToContext(
               vscode.Uri.parse(fileUri),
               sidebar.webviewProtocol,
-              ide.ideUtils
+              ide.ideUtils,
             );
           }
         } else {
-          await addEntireFileToContext(uri, sidebar.webviewProtocol, ide.ideUtils);
+          await addEntireFileToContext(
+            uri,
+            sidebar.webviewProtocol,
+            ide.ideUtils,
+          );
         }
       }
     },
@@ -703,14 +707,14 @@ const getCommandsMap: (
         } else if (
           autocompleteModels.some((model) => model.title === selectedOption)
         ) {
-          if (core.configHandler.currentProfile?.profileDescription.id) {
-            core.invoke("config/updateSelectedModel", {
-              profileId:
-                core.configHandler.currentProfile?.profileDescription.id,
-              role: "autocomplete",
-              title: selectedOption,
-            });
-          }
+          // if (core.configHandler.currentProfile?.profileDescription.id) {
+          //   core.invoke("config/updateSelectedModel", {
+          //     profileId:
+          //       core.configHandler.currentProfile?.profileDescription.id,
+          //     role: "autocomplete",
+          //     title: selectedOption,
+          //   });
+          // }
         } else if (selectedOption === "$(feedback) Give feedback") {
           vscode.commands.executeCommand("continue.giveAutocompleteFeedback");
         } else if (selectedOption === "$(comment) Open chat") {

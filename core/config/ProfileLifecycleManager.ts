@@ -34,12 +34,12 @@ export interface OrganizationDescription {
 
 export type OrgWithProfiles = OrganizationDescription & {
   profiles: ProfileLifecycleManager[];
-  currentProfile: ProfileLifecycleManager | null;
+  currentProfiles: ProfileLifecycleManager[];
 };
 
 export type SerializedOrgWithProfiles = OrganizationDescription & {
   profiles: ProfileDescription[];
-  selectedProfileId: string | null;
+  selectedProfileIds: string[];
 };
 
 export class ProfileLifecycleManager {

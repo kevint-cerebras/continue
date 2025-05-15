@@ -1,4 +1,4 @@
-import { ConfigResult } from "@continuedev/config-yaml";
+import { ConfigResult, ConfigValidationError } from "@continuedev/config-yaml";
 
 import {
   ControlPlaneClient,
@@ -16,6 +16,7 @@ import {
 import { GlobalContext } from "../util/GlobalContext.js";
 
 import { logger } from "../util/logger.js";
+import { finalToBrowserConfig } from "./load.js";
 import {
   ASSISTANTS,
   getAllDotContinueYamlFiles,
@@ -41,7 +42,6 @@ export class ConfigHandler {
   private globalLocalProfileManager: ProfileLifecycleManager;
 
   private organizations: OrgWithProfiles[] = [];
-  currentProfile: ProfileLifecycleManager | null;
   currentOrg: OrgWithProfiles;
 
   constructor(
@@ -69,9 +69,8 @@ export class ConfigHandler {
     );
 
     // Just to be safe, always force a default personal org with local profile manager
-    this.currentProfile = this.globalLocalProfileManager;
     const personalOrg: OrgWithProfiles = {
-      currentProfile: this.globalLocalProfileManager,
+      currentProfiles: [this.globalLocalProfileManager],
       profiles: [this.globalLocalProfileManager],
       ...this.PERSONAL_ORG_DESC,
     };
@@ -80,6 +79,14 @@ export class ConfigHandler {
     this.organizations = [personalOrg];
 
     void this.cascadeInit();
+  }
+
+  get currentProfiles(): ProfileLifecycleManager[] {
+    return this.currentOrg.currentProfiles;
+  }
+
+  get currentProfilesId(): string {
+    return this.currentProfiles.map((p) => p.profileDescription.id).join(":::");
   }
 
   private workspaceDirs: string[] | null = null;
@@ -131,7 +138,6 @@ export class ConfigHandler {
 
     this.organizations = orgs;
     this.currentOrg = selectedOrg;
-    this.currentProfile = selectedOrg.currentProfile;
     await this.reloadConfig();
   }
 
@@ -156,7 +162,9 @@ export class ConfigHandler {
       name: org.name,
       slug: org.slug,
       profiles: org.profiles.map((profile) => profile.profileDescription),
-      selectedProfileId: org.currentProfile?.profileDescription.id || null,
+      selectedProfileIds: org.currentProfiles.map(
+        (p) => p.profileDescription.id,
+      ),
     }));
   }
 
@@ -232,37 +240,34 @@ export class ConfigHandler {
 
     const currentSelection = selectedProfiles[profileKey];
 
-    const firstNonLocal = profiles.find(
-      (profile) => profile.profileDescription.profileType !== "local",
-    );
-    const fallback =
-      firstNonLocal ?? (profiles.length > 0 ? profiles[0] : null);
-
-    let currentProfile: ProfileLifecycleManager | null;
-    if (!currentSelection) {
-      currentProfile = fallback;
-    } else {
-      const match = profiles.find(
-        (profile) => profile.profileDescription.id === currentSelection,
-      );
-      if (match) {
-        currentProfile = match;
-      } else {
-        currentProfile = fallback;
+    let currentProfiles: ProfileLifecycleManager[] = [];
+    if (currentSelection) {
+      const profileMatches = currentSelection
+        .split(":::")
+        .map((id) => profiles.find((p) => p.profileDescription.id === id));
+      const validProfiles: ProfileLifecycleManager[] = [];
+      for (const profile of profileMatches) {
+        if (profile) {
+          validProfiles.push(profile);
+        }
       }
+      currentProfiles = validProfiles;
+    }
+    if (currentProfiles.length === 0) {
+      currentProfiles = profiles; // fallback to all profiles selected
     }
 
-    if (currentProfile) {
-      this.globalContext.update("lastSelectedProfileForWorkspace", {
-        ...selectedProfiles,
-        [profileKey]: currentProfile.profileDescription.id,
-      });
-    }
+    this.globalContext.update("lastSelectedProfileForWorkspace", {
+      ...selectedProfiles,
+      [profileKey]: currentProfiles
+        .map((p) => p.profileDescription.id)
+        .join(":::"),
+    });
 
     return {
       ...org,
       profiles,
-      currentProfile,
+      currentProfiles,
     };
   }
 
@@ -346,26 +351,24 @@ export class ConfigHandler {
     this.currentOrg = org;
 
     if (profileId) {
-      await this.setSelectedProfileId(profileId);
+      await this.setSelectedProfileIds([profileId]);
     } else {
-      this.currentProfile = org.currentProfile;
       await this.reloadConfig();
     }
   }
 
   // Profile id: check id validity, save selection, switch and reload
-  async setSelectedProfileId(profileId: string) {
-    if (
-      this.currentProfile &&
-      profileId === this.currentProfile.profileDescription.id
-    ) {
-      return;
-    }
-    const profile = this.currentOrg.profiles.find(
-      (profile) => profile.profileDescription.id === profileId,
-    );
-    if (!profile) {
-      throw new Error(`Profile ${profileId} not found in current org`);
+  async setSelectedProfileIds(profileIds: string[]) {
+    const profiles: ProfileLifecycleManager[] = [];
+    for (const id of profileIds) {
+      const profile = this.currentOrg.profiles.find(
+        (profile) => profile.profileDescription.id === id,
+      );
+      if (!profile) {
+        // throw new Error(`Profile ${id} not found in current org`);
+      } else {
+        profiles.push(profile);
+      }
     }
 
     const profileKey = await this.getProfileKey(this.currentOrg.id);
@@ -373,10 +376,10 @@ export class ConfigHandler {
       this.globalContext.get("lastSelectedProfileForWorkspace") ?? {};
     this.globalContext.update("lastSelectedProfileForWorkspace", {
       ...selectedProfiles,
-      [profileKey]: profileId,
+      [profileKey]: profileIds.join(":::"),
     });
 
-    this.currentProfile = profile;
+    this.currentOrg.currentProfiles = profiles;
     await this.reloadConfig();
   }
 
@@ -385,30 +388,26 @@ export class ConfigHandler {
   // Because of e.g. MCP singleton and docs service using things from config
   // Could improve this
   async reloadConfig() {
-    if (!this.currentProfile) {
-      return {
-        config: undefined,
-        errors: [],
-        configLoadInterrupted: true,
-      };
-    }
-
     for (const org of this.organizations) {
       for (const profile of org.profiles) {
         if (
-          profile.profileDescription.id !==
-          this.currentProfile.profileDescription.id
+          !this.currentProfiles.find(
+            (p) => p.profileDescription.id === profile.profileDescription.id,
+          )
         ) {
           profile.clearConfig();
         }
       }
     }
 
-    const { config, errors, configLoadInterrupted } =
-      await this.currentProfile.reloadConfig(this.additionalContextProviders);
-
-    this.notifyConfigListeners({ config, errors, configLoadInterrupted });
-    return { config, errors, configLoadInterrupted };
+    const configResults = await Promise.all(
+      this.currentProfiles.map((p) =>
+        p.loadConfig(this.additionalContextProviders),
+      ),
+    );
+    const mergedConfig = this.mergeConfigResults(configResults);
+    this.notifyConfigListeners(mergedConfig);
+    return mergedConfig;
   }
 
   // Listeners setup - can listen to current profile updates
@@ -430,49 +429,88 @@ export class ConfigHandler {
   async getSerializedConfig(): Promise<
     ConfigResult<BrowserSerializedContinueConfig>
   > {
-    if (!this.currentProfile) {
+    const result = await this.loadConfig();
+    if (!result.config) {
       return {
+        ...result,
         config: undefined,
-        errors: [],
-        configLoadInterrupted: true,
       };
     }
-    return await this.currentProfile.getSerializedConfig(
-      this.additionalContextProviders,
+    const serializedConfig = await finalToBrowserConfig(
+      result.config,
+      this.ide,
     );
+    return {
+      ...result,
+      config: serializedConfig,
+    };
+  }
+
+  // ** this is super bad/slow
+  mergeConfigResults(
+    configs: ConfigResult<ContinueConfig>[],
+  ): ConfigResult<ContinueConfig> {
+    const errors: ConfigValidationError[] = [];
+    const firstConfigResult = configs[0];
+    const { config: firstConfig, errors: firstErrors } = firstConfigResult;
+    if (!firstConfig) {
+      return firstConfigResult;
+    }
+    const baseConfig = firstConfig;
+    for (let i = 1; i < configs.length; i++) {
+      errors?.push(...(configs[i].errors ?? []));
+      const config = configs[i].config;
+      if (config) {
+        for (const model of config.modelsByRole.chat ?? []) {
+          if (
+            !baseConfig.modelsByRole.chat?.find((m) => m.title === model.title)
+          ) {
+            baseConfig.modelsByRole.chat.push(model);
+          }
+        }
+      }
+    }
+
+    if (errors?.length) {
+      logger.warn("Errors loading config: ", errors);
+    }
+    return {
+      config: baseConfig,
+      errors,
+      configLoadInterrupted: false,
+    };
   }
 
   async loadConfig(): Promise<ConfigResult<ContinueConfig>> {
-    if (!this.currentProfile) {
+    if (!this.currentProfiles.length) {
       return {
         config: undefined,
         errors: [],
         configLoadInterrupted: true,
       };
     }
-    const config = await this.currentProfile.loadConfig(
-      this.additionalContextProviders,
+    const configResults = await Promise.all(
+      this.currentProfiles.map((p) =>
+        p.loadConfig(this.additionalContextProviders),
+      ),
     );
-
-    if (config.errors?.length) {
-      logger.warn("Errors loading config: ", config.errors);
-    }
-    return config;
+    const mergedConfig = this.mergeConfigResults(configResults);
+    return mergedConfig;
   }
 
   async openConfigProfile(profileId?: string) {
-    let openProfileId = profileId || this.currentProfile?.profileDescription.id;
-    if (!openProfileId) {
+    // let openProfileId = profileId || this.currentProfile?.profileDescription.id;
+    if (!profileId) {
       return;
     }
     const profile = this.currentOrg.profiles.find(
-      (p) => p.profileDescription.id === openProfileId,
+      (p) => p.profileDescription.id === profileId,
     );
     if (profile?.profileDescription.profileType === "local") {
       await this.ide.openFile(profile.profileDescription.uri);
     } else {
       const env = await getControlPlaneEnv(this.ide.getIdeSettings());
-      await this.ide.openUrl(`${env.APP_URL}${openProfileId}`);
+      await this.ide.openUrl(`${env.APP_URL}${profileId}`);
     }
   }
 

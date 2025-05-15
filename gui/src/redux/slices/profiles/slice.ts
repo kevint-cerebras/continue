@@ -42,7 +42,7 @@ const initialState: ProfilesState = {
         },
       ],
       slug: "",
-      selectedProfileId: "local",
+      selectedProfileIds: ["local"],
       name: "Personal",
       iconUrl: "",
     },
@@ -59,7 +59,7 @@ export const profilesSlice = createSlice({
         (o) => o.id === state.selectedOrganizationId,
       );
       if (currentOrg) {
-        currentOrg.selectedProfileId = payload;
+        currentOrg.selectedProfileIds = payload ? [payload] : [];
       }
     },
     setOrganizations: (
@@ -72,7 +72,7 @@ export const profilesSlice = createSlice({
       state.selectedOrganizationId = payload;
       const org = state.organizations.find((o) => o.id === payload);
       if (org) {
-        state.selectedProfileId = org.selectedProfileId;
+        state.selectedProfileId = org.selectedProfileIds.join(":::");
       } else {
         state.selectedProfileId = null;
       }
