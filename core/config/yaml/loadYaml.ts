@@ -13,6 +13,7 @@ import {
   unrollAssistant,
   validateConfigYaml,
 } from "@continuedev/config-yaml";
+import * as fs from "node:fs";
 import { dirname } from "node:path";
 
 import {
@@ -100,6 +101,7 @@ async function loadConfigYaml(options: {
       { includeGlobal: true, includeWorkspace: true },
       blockType,
     );
+    console.log("localBlocks:", localBlocks);
     allLocalBlocks.push(
       ...localBlocks.map((b) => ({
         uriType: "file" as const,
@@ -107,6 +109,13 @@ async function loadConfigYaml(options: {
       })),
     );
   }
+  console.log("======");
+  console.debug("======");
+  fs.writeFileSync(
+    "/home/jacob/allLocalBlocks.json",
+    JSON.stringify(allLocalBlocks, null, 2),
+  );
+  console.log("allLocalBlocks:", allLocalBlocks);
 
   const rootPath =
     packageIdentifier.uriType === "file"

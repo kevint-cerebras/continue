@@ -91,7 +91,9 @@ export async function getAllDotContinueDefinitionFiles(
   options: LoadAssistantFilesOptions,
   subDirName: string,
 ): Promise<{ path: string; content: string }[]> {
+  console.log("subDirName:", subDirName);
   const workspaceDirs = await ide.getWorkspaceDirs();
+  console.log("workspaceDirs:", workspaceDirs);
 
   // Get all directories to check for assistant files
   const fullDirs = getDotContinueSubDirs(
@@ -100,11 +102,13 @@ export async function getAllDotContinueDefinitionFiles(
     workspaceDirs,
     subDirName,
   );
+  console.log("fullDirs:", fullDirs);
 
   // Get all assistant files from the directories
   const assistantFiles = (
     await Promise.all(fullDirs.map((dir) => getDefinitionFilesInDir(ide, dir)))
   ).flat();
+  console.log("assistantFiles", assistantFiles);
 
   return await Promise.all(
     assistantFiles.map(async (file) => {

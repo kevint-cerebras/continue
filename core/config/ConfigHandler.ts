@@ -457,6 +457,7 @@ export class ConfigHandler {
         configLoadInterrupted: true,
       };
     }
+    console.log("can we get here? ConfigHandler.ts:loadConfig");
     const config = await this.currentProfile.loadConfig(
       this.additionalContextProviders,
     );

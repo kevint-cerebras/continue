@@ -277,6 +277,8 @@ export async function unrollAssistantFromContent(
     options.asConfigResult ?? false,
   );
 
+  console.log("unrolledAssistant:", unrollAssistant);
+
   // Back to a string so we can fill in template variables
   const rawUnrolledYaml = options.asConfigResult
     ? YAML.stringify(
@@ -429,6 +431,7 @@ export async function unrollBlocks(
   }
 
   // Add injected blocks
+  console.log("injectBlocks:", injectBlocks);
   for (const injectBlock of injectBlocks ?? []) {
     try {
       const blockConfigYaml = await registry.getContent(injectBlock);

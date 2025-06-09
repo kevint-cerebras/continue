@@ -93,6 +93,7 @@ export class ProfileLifecycleManager {
       // Like invalid json, invalid yaml, file read errors, etc.
       // NOT block-specific loading errors
       try {
+        console.log("can we get here? ProfileLifecycleManager.ts:loadConfig");
         result = await this.profileLoader.doLoadConfig();
       } catch (e) {
         const message =

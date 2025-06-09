@@ -70,6 +70,15 @@ export default async function doLoadConfig(options: {
   const ideSettings = await ideSettingsPromise;
   const workOsAccessToken = await controlPlaneClient.getAccessToken();
 
+  console.log(
+    "workspaceConfigs, ideInfo, uniqueId, ideSettings, workOsAccessToken:",
+    workspaceConfigs,
+    ideInfo,
+    uniqueId,
+    ideSettings,
+    workOsAccessToken,
+  );
+
   // Migrations for old config files
   // Removes
   const configJsonPath = getConfigJsonPath();
@@ -77,14 +86,23 @@ export default async function doLoadConfig(options: {
     migrateJsonSharedConfig(configJsonPath, ide);
   }
 
+  console.log("configJsonPath:", configJsonPath);
+
   const configYamlPath = localPathOrUriToPath(
     overrideConfigYamlByPath || getConfigYamlPath(ideInfo.ideType),
   );
+
+  console.log("configYamlPath:", configYamlPath);
 
   let newConfig: ContinueConfig | undefined;
   let errors: ConfigValidationError[] | undefined;
   let configLoadInterrupted = false;
 
+  console.log(
+    "check inside doLoadConfig: overrideConfigYaml, configYamlPath exists:",
+    overrideConfigYaml,
+    fs.existsSync(configYamlPath),
+  );
   if (overrideConfigYaml || fs.existsSync(configYamlPath)) {
     const result = await loadContinueConfigFromYaml({
       ide,
