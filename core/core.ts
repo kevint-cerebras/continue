@@ -184,6 +184,7 @@ export class Core {
           return;
         }
 
+        console.log("refreshCodebaseIndex 1");
         void this.codeBaseIndexer.refreshCodebaseIndex(dirs);
       });
     });
@@ -533,6 +534,7 @@ export class Core {
       }
 
       const dirs = data?.dirs ?? (await this.ide.getWorkspaceDirs());
+      console.log("refreshCodebaseIndex 2");
       await this.codeBaseIndexer.refreshCodebaseIndex(dirs);
     });
     on("index/setPaused", (msg) => {
@@ -566,6 +568,7 @@ export class Core {
         });
         const { config } = await this.configHandler.loadConfig();
         if (config && !config.disableIndexing) {
+          console.log("refreshCodebaseIndexFiles 1");
           await this.codeBaseIndexer.refreshCodebaseIndexFiles(toRefresh);
         }
       }
@@ -837,6 +840,7 @@ export class Core {
             // Reindex the file
             const ignore = await shouldIgnore(uri, this.ide);
             if (!ignore) {
+              console.log("refreshCodebaseIndexFiles 2");
               await this.codeBaseIndexer.refreshCodebaseIndexFiles([uri]);
             }
           }
