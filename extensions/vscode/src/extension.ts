@@ -13,6 +13,7 @@ export { default as buildTimestamp } from "./.buildTimestamp";
 async function dynamicImportAndActivate(context: vscode.ExtensionContext) {
   await setupCa();
   const { activateExtension } = await import("./activation/activate");
+  console.log("dynamicImportAndActivate");
   return await activateExtension(context);
 }
 

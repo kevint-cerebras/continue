@@ -30,6 +30,7 @@ if (!fs.existsSync(guiDist)) {
 // Get the target to package for
 let target = undefined;
 const args = process.argv;
+console.log(args);
 if (args[2] === "--target") {
   target = args[3];
 }
@@ -305,6 +306,8 @@ void (async () => {
       // Initialize a new package.json and install the package
       execCmdSync(`npm init -y && npm i -f ${packageName} --no-save`);
 
+      console.log(path.join(tempDir, "node_modules", toCopy));
+      console.log(fs.readdirSync(path.join(tempDir, "node_modules", toCopy)));
       console.log(
         `Contents of: ${packageName}`,
         fs.readdirSync(path.join(tempDir, "node_modules", toCopy)),

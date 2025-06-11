@@ -40,6 +40,12 @@ function getDefaultShell(): string {
 
 function getRootDir(): string | undefined {
   const isWindows = os.platform() === "win32";
+  console.log(
+    "isWindows",
+    isWindows,
+    process.env.USERPROFILE,
+    process.env.HOME,
+  );
   let cwd = isWindows ? process.env.USERPROFILE : process.env.HOME;
   if (
     vscode.workspace.workspaceFolders &&
