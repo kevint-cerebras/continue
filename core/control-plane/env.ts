@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import { IdeSettings } from "..";
+import { ContinueConfig, IdeSettings } from "..";
 import {
   getLocalEnvironmentDotFilePath,
   getStagingEnvironmentDotFilePath,
@@ -102,4 +102,23 @@ export async function useHub(
 ): Promise<boolean> {
   const ideSettings = await ideSettingsPromise;
   return ideSettings.continueTestEnvironment !== "none";
+}
+
+export async function getControlPlaneProxyUrl(
+  ideSettingsPromise: Promise<IdeSettings>,
+  config: ContinueConfig,
+) {
+  const controlPlane = (config as any).controlPlane;
+  const useOnPremProxy =
+    controlPlane?.useContinueForTeamsProxy === false && controlPlane?.proxyUrl;
+
+  const env = await getControlPlaneEnv(ideSettingsPromise);
+  let controlPlaneProxyUrl: string = useOnPremProxy
+    ? controlPlane?.proxyUrl
+    : env.DEFAULT_CONTROL_PLANE_PROXY_URL;
+
+  if (!controlPlaneProxyUrl.endsWith("/")) {
+    controlPlaneProxyUrl += "/";
+  }
+  return controlPlaneProxyUrl;
 }

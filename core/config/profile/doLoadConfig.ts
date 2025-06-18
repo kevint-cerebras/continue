@@ -24,7 +24,7 @@ import MCPContextProvider from "../../context/providers/MCPContextProvider";
 import RulesContextProvider from "../../context/providers/RulesContextProvider";
 import { ControlPlaneProxyInfo } from "../../control-plane/analytics/IAnalyticsProvider.js";
 import { ControlPlaneClient } from "../../control-plane/client.js";
-import { getControlPlaneEnv } from "../../control-plane/env.js";
+import { getControlPlaneProxyUrl } from "../../control-plane/env.js";
 import { TeamAnalytics } from "../../control-plane/TeamAnalytics.js";
 import ContinueProxy from "../../llm/llms/stubs/ContinueProxy";
 import { getConfigDependentToolDefinitions } from "../../tools";
@@ -285,18 +285,11 @@ export default async function doLoadConfig(options: {
   await TTS.setup();
 
   // Set up control plane proxy if configured
-  const controlPlane = (newConfig as any).controlPlane;
-  const useOnPremProxy =
-    controlPlane?.useContinueForTeamsProxy === false && controlPlane?.proxyUrl;
+  const controlPlaneProxyUrl = await getControlPlaneProxyUrl(
+    ideSettingsPromise,
+    newConfig,
+  );
 
-  const env = await getControlPlaneEnv(ideSettingsPromise);
-  let controlPlaneProxyUrl: string = useOnPremProxy
-    ? controlPlane?.proxyUrl
-    : env.DEFAULT_CONTROL_PLANE_PROXY_URL;
-
-  if (!controlPlaneProxyUrl.endsWith("/")) {
-    controlPlaneProxyUrl += "/";
-  }
   const controlPlaneProxyInfo = {
     profileId,
     controlPlaneProxyUrl,
@@ -339,12 +332,6 @@ async function injectControlPlaneProxyInfo(
   Object.keys(config.selectedModelByRole).forEach((key) => {
     const model = config.selectedModelByRole[key as ModelRole];
     if (model?.providerName === "continue-proxy") {
-      (model as ContinueProxy).controlPlaneProxyInfo = info;
-    }
-  });
-
-  config.modelsByRole.chat.forEach((model) => {
-    if (model.providerName === "continue-proxy") {
       (model as ContinueProxy).controlPlaneProxyInfo = info;
     }
   });

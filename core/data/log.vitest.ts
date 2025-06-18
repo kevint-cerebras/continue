@@ -1,13 +1,30 @@
 import { DevDataLogEvent } from "@continuedev/config-yaml";
-import fs from "fs";
+import * as continueFetch from "@continuedev/fetch";
+import fs, { writeFileSync } from "fs";
 import path from "path";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { IdeInfo, IdeSettings } from "..";
 import { Core } from "../core";
 import { getDevDataFilePath } from "../util/paths";
 import { DataLogger } from "./log";
 
-// Only mock fetch, not fs
-jest.mock("@continuedev/fetch");
+vi.mock("@continuedev/fetch");
+
+vi.mock("fs", async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof fs;
+  return {
+    ...actual,
+    writeFileSync: vi.fn(),
+  };
+});
 
 const TEST_EVENT: DevDataLogEvent = {
   name: "tokensGenerated",
@@ -54,7 +71,7 @@ describe("DataLogger", () => {
 
   beforeEach(() => {
     // Reset mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Remove test file if it exists
     if (fs.existsSync(testFilePath)) {
@@ -67,7 +84,7 @@ describe("DataLogger", () => {
     // Mock core and required promises
     dataLogger.core = {
       configHandler: {
-        loadConfig: jest.fn().mockResolvedValue({
+        loadConfig: vi.fn().mockResolvedValue({
           config: {
             data: [],
           },
@@ -78,7 +95,7 @@ describe("DataLogger", () => {
           },
         },
         controlPlaneClient: {
-          getAccessToken: jest.fn().mockResolvedValue("test-access-token"),
+          getAccessToken: vi.fn().mockResolvedValue("test-access-token"),
         },
       },
     } as unknown as Core;
@@ -194,14 +211,12 @@ describe("DataLogger", () => {
 
   describe("logDevData", () => {
     it("should log data locally and to configured destinations", async () => {
-      // Spy on logLocalData and logToOneDestination
-      const logLocalDataSpy = jest
-        .spyOn(dataLogger, "logLocalData")
-        .mockResolvedValue();
-      const logToOneDestinationSpy = jest
-        .spyOn(dataLogger, "logToOneDestination")
-        .mockResolvedValue();
-
+      // Spy on logLocalData and logToOneDestination WITHOUT mocking the implementation
+      const logLocalDataSpy = vi.spyOn(dataLogger, "logLocalData");
+      const logToOneDestinationSpy = vi.spyOn(
+        dataLogger,
+        "logToOneDestination",
+      );
       // Mock config with multiple data destinations
       const mockConfig = {
         config: {
@@ -212,7 +227,7 @@ describe("DataLogger", () => {
         },
       };
 
-      dataLogger.core!.configHandler.loadConfig = jest
+      dataLogger.core!.configHandler.loadConfig = vi
         .fn()
         .mockResolvedValue(mockConfig);
 
@@ -220,6 +235,32 @@ describe("DataLogger", () => {
 
       expect(logLocalDataSpy).toHaveBeenCalledWith(TEST_EVENT);
       expect(logToOneDestinationSpy).toHaveBeenCalledTimes(2);
+      // Now you can check if these were called, since logToOneDestination's implementation will run
+      expect(writeFileSync).toHaveBeenCalledTimes(1);
+      expect(continueFetch.fetchwithRequestOptions).toHaveBeenCalled();
     });
+    // it("should log data to continue-proxy destination", async () => {
+    //   const logLocalDataSpy = vi
+    //     .spyOn(dataLogger, "logLocalData")
+    //     .mockResolvedValue();
+    //   const logToOneDestinationSpy = vi
+    //     .spyOn(dataLogger, "logToOneDestination")
+    //     .mockResolvedValue();
+
+    //   const mockConfig = {
+    //     config: {
+    //       data: [{ destination: "continue-proxy", schema: SCHEMA }],
+    //     },
+    //   };
+
+    //   dataLogger.core!.configHandler.loadConfig = vi
+    //     .fn()
+    //     .mockResolvedValue(mockConfig);
+
+    //   await dataLogger.logDevData(TEST_EVENT);
+
+    //   expect(logLocalDataSpy).toHaveBeenCalledWith(TEST_EVENT);
+    //   expect(logToOneDestinationSpy).toHaveBeenCalledTimes(1);
+    // });
   });
 });

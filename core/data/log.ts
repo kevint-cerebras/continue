@@ -11,10 +11,10 @@ import { fetchwithRequestOptions } from "@continuedev/fetch";
 import * as URI from "uri-js";
 import { fileURLToPath } from "url";
 import { AnyZodObject } from "zod";
+import { getControlPlaneProxyUrl } from "../control-plane/env.js";
 import { Core } from "../core.js";
 import { ContinueConfig, IdeInfo, IdeSettings } from "../index.js";
 import { getDevDataFilePath } from "../util/paths.js";
-import { joinPathsToUri } from "../util/uri.js";
 
 const DEFAULT_DEV_DATA_LEVEL: DataLogLevel = "all";
 export const LOCAL_DEV_DATA_VERSION = "0.2.0";
@@ -23,6 +23,7 @@ export class DataLogger {
   core?: Core;
   ideSettingsPromise?: Promise<IdeSettings>;
   ideInfoPromise?: Promise<IdeInfo>;
+  proxyUrl?: string;
 
   private constructor() {}
 
@@ -110,7 +111,7 @@ export class DataLogger {
     if (config?.data?.length) {
       await Promise.allSettled(
         config.data.map((dataConfig) =>
-          this.logToOneDestination(dataConfig, event),
+          this.logToOneDestination(dataConfig, event, config),
         ),
       );
     }
@@ -162,6 +163,7 @@ export class DataLogger {
   async logToOneDestination(
     dataConfig: NonNullable<ContinueConfig["data"]>[number],
     event: DevDataLogEvent,
+    config?: ContinueConfig,
   ) {
     try {
       if (!dataConfig) {
@@ -181,7 +183,22 @@ export class DataLogger {
       // Parse the event data, throwing if it fails
       const parsed = await this.parseEventData(event, schema, level);
 
-      const uriComponents = URI.parse(dataConfig.destination);
+      let destination = dataConfig.destination;
+      if (destination === "continue-proxy") {
+        if (this.ideSettingsPromise && config) {
+          destination = await getControlPlaneProxyUrl(
+            this.ideSettingsPromise,
+            config,
+          );
+        } else {
+          console.warn(
+            "Config not available or IdeSettings not yet retrieved, cannot log data to continue proxy",
+          );
+          return;
+        }
+      }
+
+      const uriComponents = URI.parse(destination);
 
       // Send to remote server
       if (uriComponents.scheme === "https" || uriComponents.scheme === "http") {
@@ -201,7 +218,7 @@ export class DataLogger {
         const profileId =
           this.core?.configHandler.currentProfile?.profileDescription.id ?? "";
         const response = await fetchwithRequestOptions(
-          dataConfig.destination,
+          destination,
           {
             method: "POST",
             headers,
@@ -222,13 +239,16 @@ export class DataLogger {
         }
       } else if (uriComponents.scheme === "file") {
         // Write to jsonc file for local file URIs
-        const dirUri = joinPathsToUri(dataConfig.destination, schema);
-        const dirPath = fileURLToPath(dirUri);
+        const dirPath = fileURLToPath(destination);
+        const schemaPath = path.join(dirPath, schema);
 
         if (!fs.existsSync(dirPath)) {
           fs.mkdirSync(dirPath, { recursive: true });
         }
-        const filepath = path.join(dirPath, `${event.name}.jsonl`);
+        if (!fs.existsSync(schemaPath)) {
+          fs.mkdirSync(schemaPath, { recursive: true });
+        }
+        const filepath = path.join(schemaPath, `${event.name}.jsonl`);
         const jsonLine = JSON.stringify(event.data);
         fs.writeFileSync(filepath, `${jsonLine}\n`, { flag: "a" });
       } else {
