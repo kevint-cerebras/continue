@@ -5,7 +5,6 @@ import {
   getStagingEnvironmentDotFilePath,
 } from "../util/paths";
 import { AuthType, ControlPlaneEnv } from "./AuthTypes";
-import { getLicenseKeyData } from "./mdm/mdm";
 
 export const EXTENSION_NAME = "continue";
 
@@ -59,16 +58,24 @@ export function getControlPlaneEnvSync(
   ideTestEnvironment: IdeSettings["continueTestEnvironment"],
 ): ControlPlaneEnv {
   // MDM override
-  const licenseKeyData = getLicenseKeyData();
-  if (licenseKeyData?.unsignedData?.apiUrl) {
-    const { apiUrl } = licenseKeyData.unsignedData;
-    return {
-      AUTH_TYPE: AuthType.OnPrem,
-      DEFAULT_CONTROL_PLANE_PROXY_URL: apiUrl,
-      CONTROL_PLANE_URL: apiUrl,
-      APP_URL: "https://hub.continue.dev/",
-    };
-  }
+
+  const apiUrl = "http://localhost:442";
+  return {
+    AUTH_TYPE: AuthType.OnPrem,
+    DEFAULT_CONTROL_PLANE_PROXY_URL: apiUrl,
+    CONTROL_PLANE_URL: apiUrl,
+    APP_URL: "https://hub.continue.dev/",
+  };
+  // const licenseKeyData = getLicenseKeyData();
+  // if (licenseKeyData?.unsignedData?.apiUrl) {
+  //   const { apiUrl } = licenseKeyData.unsignedData;
+  //   return {
+  //     AUTH_TYPE: AuthType.OnPrem,
+  //     DEFAULT_CONTROL_PLANE_PROXY_URL: apiUrl,
+  //     CONTROL_PLANE_URL: apiUrl,
+  //     APP_URL: "https://hub.continue.dev/",
+  //   };
+  // }
 
   // Note .local overrides .staging
   if (fs.existsSync(getLocalEnvironmentDotFilePath())) {
@@ -79,22 +86,21 @@ export function getControlPlaneEnvSync(
     return STAGING_ENV;
   }
 
-  const env =
-    ideTestEnvironment === "production"
-      ? "hub"
-      : ideTestEnvironment === "staging"
-        ? "staging"
-        : ideTestEnvironment === "local"
-          ? "local"
-          : process.env.CONTROL_PLANE_ENV;
+  const env = ideTestEnvironment === "production";
+  //     ? "hub"
+  //     : ideTestEnvironment === "staging"
+  //       ? "staging"
+  //       : ideTestEnvironment === "local"
+  //         ? "local"
+  //         : process.env.CONTROL_PLANE_ENV;
 
-  return env === "local"
-    ? LOCAL_ENV
-    : env === "staging"
-      ? STAGING_ENV
-      : env === "test"
-        ? TEST_ENV
-        : PRODUCTION_HUB_ENV;
+  // return env === "local"
+  //   ? LOCAL_ENV
+  //   : env === "staging"
+  //     ? STAGING_ENV
+  //     : env === "test"
+  //       ? TEST_ENV
+  //       : PRODUCTION_HUB_ENV;
 }
 
 export async function useHub(
