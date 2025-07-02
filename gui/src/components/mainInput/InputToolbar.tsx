@@ -4,7 +4,10 @@ import {
   PhotoIcon,
 } from "@heroicons/react/24/outline";
 import { InputModifiers } from "core";
-import { modelSupportsImages, modelSupportsTools } from "core/llm/autodetect";
+import {
+  modelSupportsImages,
+  modelSupportsNativeTools,
+} from "core/llm/autodetect";
 import { useContext, useRef } from "react";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
@@ -68,7 +71,7 @@ function InputToolbar(props: InputToolbarProps) {
     (currentToolCallApplyState &&
       currentToolCallApplyState.status !== "closed");
 
-  const toolsSupported = defaultModel && modelSupportsTools(defaultModel);
+  const toolsSupported = defaultModel && modelSupportsNativeTools(defaultModel);
 
   const supportsImages =
     defaultModel &&

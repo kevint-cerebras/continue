@@ -1,6 +1,6 @@
 import { CheckIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { MessageModes } from "core";
-import { modelSupportsTools } from "core/llm/autodetect";
+import { modelSupportsNativeTools } from "core/llm/autodetect";
 import { useCallback, useEffect, useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { selectSelectedChatModel } from "../../redux/slices/configSlice";
@@ -15,7 +15,7 @@ export function ModeSelect() {
   const mode = useAppSelector((store) => store.session.mode);
   const selectedModel = useAppSelector(selectSelectedChatModel);
   const agentModeSupported = useMemo(() => {
-    return selectedModel && modelSupportsTools(selectedModel);
+    return selectedModel && modelSupportsNativeTools(selectedModel);
   }, [selectedModel]);
   const { mainEditor } = useMainEditor();
   const metaKeyLabel = useMemo(() => {

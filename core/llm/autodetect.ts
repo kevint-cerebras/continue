@@ -106,7 +106,7 @@ const MODEL_SUPPORTS_IMAGES: string[] = [
   "granite-vision",
 ];
 
-function modelSupportsTools(modelDescription: ModelDescription) {
+function modelSupportsNativeTools(modelDescription: ModelDescription) {
   if (modelDescription.capabilities?.tools !== undefined) {
     return modelDescription.capabilities.tools;
   }
@@ -393,5 +393,5 @@ export {
   autodetectTemplateType,
   llmCanGenerateInParallel,
   modelSupportsImages,
-  modelSupportsTools,
+  modelSupportsNativeTools,
 };
