@@ -12,7 +12,7 @@ export function CreateFile(props: CreateFileToolCallProps) {
     return null;
   }
 
-  const src = `\`\`\`${getMarkdownLanguageTagForFile(props.relativeFilepath ?? "output.txt")} ${props.relativeFilepath}\n${props.fileContents ?? ""}\n\`\`\``;
+  const src = `~~~${getMarkdownLanguageTagForFile(props.relativeFilepath ?? "output.txt")} ${props.relativeFilepath}\n${props.fileContents ?? ""}\n~~~`;
 
   return props.relativeFilepath ? (
     <StyledMarkdownPreview

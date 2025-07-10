@@ -13,7 +13,7 @@ export function EditFile(props: EditToolCallProps) {
     return null;
   }
 
-  const src = `\`\`\`${getMarkdownLanguageTagForFile(props.relativeFilePath)} ${props.relativeFilePath}\n${props.changes}\n\`\`\``;
+  const src = `~~~${getMarkdownLanguageTagForFile(props.relativeFilePath)} ${props.relativeFilePath}\n${props.changes}\n~~~`;
 
   return (
     <StyledMarkdownPreview
