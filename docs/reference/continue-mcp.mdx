@@ -18,17 +18,24 @@ Run the following command to install the Continue documentation MCP server:
 npx mint-mcp add docs.continue.dev
 ```
 
-This will:
+When prompted, select "All" from the selection menu:
+
+![mintlify cli selection tree](/images/mintlify-cli-selection-tree.png)
+
+This command will:
 
 - Download and install the MCP server locally
 - Set up the search tool for Continue documentation
 - Create the necessary configuration files
 
+<Info>
+Take note of the installation path displayed after running the command above. You'll need to replace in the configuration below with your actual installation path.
+
+It will look like this: `/path/to/user/.mcp/docs.continue.dev/src/index.js`
+
+</Info>
+
 ### Step 2: Configure Continue
-
-First Run `npx mint-mcp add docs.continue.dev` and select All from the selection.
-
-![mintlify cli selection tree](/images/mintlify-cli-selection-tree.png)
 
 1. Create a folder called `.continue/mcpServers` at the top level of your workspace
 2. Add a file called `continue-docs-mcp.yaml` to this folder
