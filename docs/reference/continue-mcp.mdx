@@ -15,7 +15,7 @@ The Continue Documentation MCP Server allows you to search and retrieve informat
 Run the following command to install the Continue documentation MCP server:
 
 ```bash
-npx mint-mcp add continue-docs
+npx mint-mcp add docs.continue.dev
 ```
 
 This will:
@@ -36,12 +36,9 @@ version: 0.0.1
 schema: v1
 mcpServers:
   - name: Continue Docs Search
-    type: stdio
-    command: npx
+    command: node
     args:
-      - mint-mcp
-      - add
-      - continue-docs
+      - "/path/to/user/.mcp/docs.continue.dev/src/index.js"
 ```
 
 ### Step 3: Enable Agent Mode
