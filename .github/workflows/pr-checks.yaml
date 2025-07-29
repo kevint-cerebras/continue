@@ -230,13 +230,23 @@ jobs:
       - name: Build packages and get test files
         id: get-test-files
         run: |
+          # Store the original directory
+          ORIGINAL_DIR=$(pwd)
+          
+          # Build packages from repo root
           node ./scripts/build-packages.js
+          
+          # Return to original directory after build-packages
+          cd "$ORIGINAL_DIR"
+          
           if [ "${{ steps.vscode-cache.outputs.cache-hit }}" != "true" ]; then
             cd core
             npm ci
             cd ../extensions/vscode
             npm ci
+            cd "$ORIGINAL_DIR"
           fi
+          
           cd extensions/vscode
           npm run e2e:compile
           if [[ "${{ github.event.pull_request.head.repo.fork }}" == "true" || "${{ github.actor }}" == "dependabot[bot]" ]]; then
