@@ -318,13 +318,41 @@ export const PROVIDER_TOOL_SUPPORT: Record<string, (model: string) => boolean> =
         model.toLowerCase().startsWith("kimi") &&
         model.toLowerCase() !== "kimi-thinking-preview"
       ) {
+    cerebras: (model) => {
+      // https://inference-docs.cerebras.ai/api-reference/chat-completions
+      // Cerebras supports tool calling for their models
+      const lowerCaseModel = model.toLowerCase();
+      
+      // All Llama 3.1+ models support function calling
+      if (lowerCaseModel.includes("llama3.1") || lowerCaseModel.includes("llama-3.1")) {
         return true;
       }
-
-      if (model.toLowerCase().startsWith("moonshot")) {
+      
+      // All Llama 3.3+ models support function calling
+      if (lowerCaseModel.includes("llama3.3") || lowerCaseModel.includes("llama-3.3")) {
         return true;
       }
-
+      
+      // All Llama 4+ models support function calling
+      if (lowerCaseModel.includes("llama4") || lowerCaseModel.includes("llama-4")) {
+        return true;
+      }
+      
+      // Qwen 3+ models support function calling
+      if (lowerCaseModel.includes("qwen-3") || lowerCaseModel.includes("qwen3")) {
+        return true;
+      }
+      
+      // DeepSeek models with reasoning support function calling
+      if (lowerCaseModel.includes("deepseek-r1") || lowerCaseModel.includes("deepseek")) {
+        return true;
+      }
+      
+      // GPT OSS models support function calling
+      if (lowerCaseModel.includes("gpt-oss")) {
+        return true;
+      }
+      
       return false;
     },
   };
@@ -338,6 +366,14 @@ export function isRecommendedAgentModel(modelName: string): boolean {
     [/gpt/, /4/],
     [/claude/, /sonnet/, /3\.5|3\.7|3-5|3-7|-4/],
     [/claude/, /opus/, /-4/],
+    // Cerebras models - excellent for agent work with fast inference
+    [/qwen/, /3/, /coder/], // Qwen 3 Coder models
+    [/qwen/, /3/, /480b/], // Qwen 3 480B models  
+    [/qwen/, /3/, /235b/], // Qwen 3 235B models
+    [/qwen/, /3/, /32b/], // Qwen 3 32B models
+    [/llama/, /3\.3|3-3/], // Llama 3.3+ models
+    [/llama/, /4/], // Llama 4+ models
+    [/gpt/, /oss/], // GPT OSS models
   ];
   for (const combo of recs) {
     if (combo.every((regex) => modelName.toLowerCase().match(regex))) {
@@ -347,13 +383,21 @@ export function isRecommendedAgentModel(modelName: string): boolean {
   return false;
 }
 export function modelSupportsNativeTools(modelDescription: ModelDescription) {
+    provider: modelDescription.provider,
+    model: modelDescription.model,
+    title: modelDescription.title
+  });
+  
   if (modelDescription.capabilities?.tools !== undefined) {
     return modelDescription.capabilities.tools;
   }
-
+  
   const providerSupport = PROVIDER_TOOL_SUPPORT[modelDescription.provider];
   if (!providerSupport) {
     return false;
   }
   return providerSupport(modelDescription.model) ?? false;
+  
+  const result = providerSupport(modelDescription.model) ?? false;
+  return result;
 }

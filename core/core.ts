@@ -76,7 +76,6 @@ import type { FromCoreProtocol, ToCoreProtocol } from "./protocol";
 import { OnboardingModes } from "./protocol/core";
 import type { IMessenger, Message } from "./protocol/messenger";
 import { getUriPathBasename } from "./util/uri";
-import { PrefetchQueue } from "./nextEdit/NextEditPrefetchQueue";
 
 const hasRulesFiles = (uris: string[]): boolean => {
   for (const uri of uris) {
@@ -338,17 +337,22 @@ export class Core {
       );
     });
 
+    on("config/reload", async (msg) => {
+      // User force reloading will retrigger colocated rules
+      const codebaseRulesCache = CodebaseRulesCache.getInstance();
+      await codebaseRulesCache.refresh(this.ide);
+      void this.configHandler.reloadConfig(
+        "Force reloaded (config/reload message)",
+      );
+    });
+
     on("config/ideSettingsUpdate", async (msg) => {
       await this.configHandler.updateIdeSettings(msg.data);
     });
 
     on("config/refreshProfiles", async (msg) => {
-      // User force reloading will retrigger colocated rules
-      const codebaseRulesCache = CodebaseRulesCache.getInstance();
-      await codebaseRulesCache.refresh(this.ide);
-
-      const { selectOrgId, selectProfileId, reason } = msg.data ?? {};
-      await this.configHandler.refreshAll(reason);
+      const { selectOrgId, selectProfileId } = msg.data ?? {};
+      await this.configHandler.refreshAll();
       if (selectOrgId) {
         await this.configHandler.setSelectedOrgId(selectOrgId, selectProfileId);
       } else if (selectProfileId) {
@@ -466,7 +470,7 @@ export class Core {
         profileId:
           this.configHandler.currentProfile?.profileDescription.id ?? null,
         organizations: this.configHandler.getSerializedOrgs(),
-        selectedOrgId: this.configHandler.currentOrg?.id ?? null,
+        selectedOrgId: this.configHandler.currentOrg.id,
       };
     });
 
@@ -480,14 +484,25 @@ export class Core {
     });
 
     on("llm/streamChat", (msg) => {
-      const abortController = this.addMessageAbortController(msg.messageId);
-      return llmStreamChat(
-        this.configHandler,
-        abortController,
-        msg,
-        this.ide,
-        this.messenger,
-      );
+      
+      try {
+        const abortController = this.addMessageAbortController(msg.messageId);
+        console.log(`[CORE MESSAGE HANDLER] Created abort controller, calling llmStreamChat...`);
+        
+        const result = llmStreamChat(
+          this.configHandler,
+          abortController,
+          msg,
+          this.ide,
+          this.messenger,
+        );
+        
+        console.log(`[CORE MESSAGE HANDLER] llmStreamChat called successfully, returning generator`);
+        return result;
+      } catch (error) {
+        console.error(`[CORE MESSAGE HANDLER] ERROR in llm/streamChat handler:`, error);
+        throw error;
+      }
     });
 
     on("llm/complete", async (msg) => {
@@ -579,79 +594,17 @@ export class Core {
     // Next Edit
     on("nextEdit/predict", async (msg) => {
       const outcome = await this.nextEditProvider.provideInlineCompletionItems(
-        msg.data.input,
+        msg.data,
         undefined,
-        {
-          withChain: msg.data.options?.withChain ?? false,
-          usingFullFileDiff: msg.data.options?.usingFullFileDiff ?? true,
-        },
+        { withChain: false },
       );
-      return outcome;
-      // ? [outcome.completion, outcome.originalEditableRange]
+      return outcome ? [outcome.completion, outcome.originalEditableRange] : [];
     });
     on("nextEdit/accept", async (msg) => {
-      console.log("nextEdit/accept");
       this.nextEditProvider.accept(msg.data.completionId);
     });
     on("nextEdit/reject", async (msg) => {
-      console.log("nextEdit/reject");
       this.nextEditProvider.reject(msg.data.completionId);
-    });
-    on("nextEdit/startChain", async (msg) => {
-      console.log("nextEdit/startChain");
-      NextEditProvider.getInstance().startChain();
-      return;
-    });
-
-    on("nextEdit/deleteChain", async (msg) => {
-      console.log("nextEdit/deleteChain");
-      await NextEditProvider.getInstance().deleteChain();
-      return;
-    });
-
-    on("nextEdit/isChainAlive", async (msg) => {
-      console.log("nextEdit/isChainAlive");
-      return NextEditProvider.getInstance().chainExists();
-    });
-
-    on("nextEdit/queue/getProcessedCount", async (msg) => {
-      console.log("nextEdit/queue/getProcessedCount");
-      const queue = PrefetchQueue.getInstance();
-      console.log(queue.processedCount);
-      return queue.processedCount;
-    });
-
-    on("nextEdit/queue/dequeueProcessed", async (msg) => {
-      console.log("nextEdit/queue/dequeueProcessed");
-      const queue = PrefetchQueue.getInstance();
-      return queue.dequeueProcessed() || null;
-    });
-
-    on("nextEdit/queue/processOne", async (msg) => {
-      console.log("nextEdit/queue/processOne");
-      const { ctx, recentlyVisitedRanges, recentlyEditedRanges } = msg.data;
-      const queue = PrefetchQueue.getInstance();
-
-      await queue.process({
-        ...ctx,
-        recentlyVisitedRanges,
-        recentlyEditedRanges,
-      });
-      return;
-    });
-
-    on("nextEdit/queue/clear", async (msg) => {
-      console.log("nextEdit/queue/clear");
-      const queue = PrefetchQueue.getInstance();
-      queue.clear();
-      return;
-    });
-
-    on("nextEdit/queue/abort", async (msg) => {
-      console.log("nextEdit/queue/abort");
-      const queue = PrefetchQueue.getInstance();
-      queue.abort();
-      return;
     });
 
     on("streamDiffLines", async (msg) => {
@@ -782,7 +735,7 @@ export class Core {
           }
         }
         if (localAssistantCreated) {
-          await this.configHandler.refreshAll("Local assistant file created");
+          await this.configHandler.refreshAll();
         }
       }
     });
